@@ -8,6 +8,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Data;
@@ -28,8 +29,6 @@ namespace WpfTaskManager
         private string startProcess;
         public string StartProcess { get => startProcess; set => Set(ref startProcess, value); }
 
-        ObservableCollection<ProcessItem> Coll = new ObservableCollection<ProcessItem>();
-
         private DispatcherTimer tm;
         private object _itemsLock = new object();
 
@@ -37,9 +36,8 @@ namespace WpfTaskManager
         {
             
             ProcessCollection = new ObservableCollection<ProcessItem>();
-           
+            BindingOperations.EnableCollectionSynchronization(ProcessCollection, _itemsLock);
 
-            //ProcessCollection = new ObservableCollection<ProcessItem>();
             foreach (var item in Process.GetProcesses())
             {
                 try
@@ -65,14 +63,14 @@ namespace WpfTaskManager
                    
                 }
                 catch (Exception) { }
-              //  BindingOperations.EnableCollectionSynchronization(ProcessCollection, _itemsLock);
-                //Thread thread = new Thread(() =>
-                //{
-                tm = new DispatcherTimer();
+                //  
+                Thread thread = new Thread(() =>
+                {
+                    tm = new DispatcherTimer();
                     tm.Tick += TimerOnTick;
-                    tm.Interval = new TimeSpan(0, 0, 10);
+                    tm.Interval = new TimeSpan(0, 0, 20);
                     tm.Start();
-               // });
+                });
 
             }
         }
@@ -80,7 +78,8 @@ namespace WpfTaskManager
         private  void TimerOnTick(object sender, EventArgs eventArgs)
         {
             ProcessCollection.Clear();
-            Task.Run(() => LoadProcesses());
+            // Task.Run(() => LoadProcesses());
+            Task.Factory.StartNew(() => LoadProcesses());
         }
 
         public void LoadProcesses()
@@ -107,18 +106,18 @@ namespace WpfTaskManager
                     }
                     catch (Exception) { }
 
-                    Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
-                    {
-                        if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
-                            ProcessCollection.Add(newItem);
-                    });
-
-                    //lock (_itemsLock)
+                    //Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
                     //{
-                    //    // Once locked, you can manipulate the collection safely from another thread
-                    //   // if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
-                    //       ProcessCollection.Add(newItem);
-                    //}
+                    //    if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
+                    //        ProcessCollection.Add(newItem);
+                    //});
+
+                    lock (_itemsLock)
+                    {
+                        // Once locked, you can manipulate the collection safely from another thread
+                        // if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
+                        ProcessCollection.Add(newItem);
+                    }
                 }
                 catch (Exception) { }
             }
@@ -189,6 +188,7 @@ namespace WpfTaskManager
                         {
                             Process.Start(StartProcess);
                             MessageBox.Show("Started");
+                            StartProcess = "";
                             ProcessCollection.Clear();
                             LoadProcesses();
                         }
@@ -206,10 +206,11 @@ namespace WpfTaskManager
             get => endCommand ?? (endCommand = new RelayCommand(
                 () =>
                 {
-                    var qw = Process.GetProcesses().Where(i => i.Id == SelItem.Pid);
-                    if (qw.Any())
+                    var qw = Process.GetProcessById(SelItem.Pid);
+                    if (qw != null)
                     {
-                        qw.Single().Kill();
+                        qw.Kill();
+                        SelItem = null;
                         MessageBox.Show("Killed☠");
                         ProcessCollection.Clear();
                         LoadProcesses();
