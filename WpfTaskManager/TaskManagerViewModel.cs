@@ -29,14 +29,14 @@ namespace WpfTaskManager
         private string startProcess;
         public string StartProcess { get => startProcess; set => Set(ref startProcess, value); }
 
-        private DispatcherTimer tm;
+        private Timer tm;
         private object _itemsLock = new object();
 
         public TaskManagerViewModel()
         {
             
             ProcessCollection = new ObservableCollection<ProcessItem>();
-            BindingOperations.EnableCollectionSynchronization(ProcessCollection, _itemsLock);
+           // BindingOperations.EnableCollectionSynchronization(ProcessCollection, _itemsLock);
 
             foreach (var item in Process.GetProcesses())
             {
@@ -64,26 +64,27 @@ namespace WpfTaskManager
                 }
                 catch (Exception) { }
                 //  
-                Thread thread = new Thread(() =>
-                {
-                    tm = new DispatcherTimer();
-                    tm.Tick += TimerOnTick;
-                    tm.Interval = new TimeSpan(0, 0, 20);
-                    tm.Start();
-                });
+                //Thread thread = new Thread(() =>
+                //{
+                    tm = new Timer(LoadProcesses,null,0,5000);
+                    //tm.Tick += TimerOnTick;
+                    //tm.Interval = new TimeSpan(0, 0, 8);
+                   // tm.Start();
+                //});
 
             }
         }
 
-        private  void TimerOnTick(object sender, EventArgs eventArgs)
+        private  void TimerOnTick(object sender)
         {
-            ProcessCollection.Clear();
+          //  ProcessCollection.Clear();
             // Task.Run(() => LoadProcesses());
-            Task.Factory.StartNew(() => LoadProcesses());
+           // Task.Factory.StartNew(() => LoadProcesses());
         }
 
-        public void LoadProcesses()
+        public void LoadProcesses(object sender)
         {
+            var newColl = new ObservableCollection<ProcessItem>();
             foreach (var item in Process.GetProcesses())
             {
                 try
@@ -105,23 +106,31 @@ namespace WpfTaskManager
                         }
                     }
                     catch (Exception) { }
+                    if (!newColl.Where(i => i.Pid == newItem.Pid).Any())
+                        newColl.Add(newItem);
 
-                    //Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
+                    //lock (_itemsLock)
                     //{
-                    //    if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
-                    //        ProcessCollection.Add(newItem);
-                    //});
-
-                    lock (_itemsLock)
-                    {
-                        // Once locked, you can manipulate the collection safely from another thread
-                        // if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
-                        ProcessCollection.Add(newItem);
-                    }
+                    //    // Once locked, you can manipulate the collection safely from another thread
+                    //    // if (!ProcessCollection.Where(i => i.Pid == newItem.Pid).Any())
+                    //    ProcessCollection.Add(newItem);
+                    //}
                 }
                 catch (Exception) { }
             }
+            
+            Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
+            {
+                ProcessCollection = newColl;
+            });
 
+            //if (SelItem != null)
+            //{
+            //    var pname = SelItem.Name;
+            //    if (ProcessCollection.Where(n => n.Name == pname) != null)
+            //        SelItem = ProcessCollection.Where(n => n.Name == pname).FirstOrDefault();
+
+            //}
         }
 
         public string GetProcessOwner(int processId)
@@ -190,7 +199,7 @@ namespace WpfTaskManager
                             MessageBox.Show("Started");
                             StartProcess = "";
                             ProcessCollection.Clear();
-                            LoadProcesses();
+                            LoadProcesses(null);
                         }
                         catch (Exception ex)
                         {
@@ -213,7 +222,7 @@ namespace WpfTaskManager
                         SelItem = null;
                         MessageBox.Show("Killed☠");
                         ProcessCollection.Clear();
-                        LoadProcesses();
+                        LoadProcesses(null);
                     }
                     
                 }
