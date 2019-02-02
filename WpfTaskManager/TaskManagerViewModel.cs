@@ -84,7 +84,12 @@ namespace WpfTaskManager
 
         public void LoadProcesses(object sender)
         {
-            var newColl = new ObservableCollection<ProcessItem>();
+            //int id;
+            //if (SelItem != null)
+            //{
+            //    id = SelItem.Pid;
+            //}
+                var newColl = new ObservableCollection<ProcessItem>();
             foreach (var item in Process.GetProcesses())
             {
                 try
@@ -121,14 +126,15 @@ namespace WpfTaskManager
             
             Application.Current.Dispatcher.BeginInvoke((Action)delegate ()
             {
-                ProcessCollection = newColl;
+                //ProcessCollection = newColl;
+
             });
 
             //if (SelItem != null)
             //{
-            //    var pname = SelItem.Name;
-            //    if (ProcessCollection.Where(n => n.Name == pname) != null)
-            //        SelItem = ProcessCollection.Where(n => n.Name == pname).FirstOrDefault();
+            //    //var pname = SelItem.Name;
+            //    //if (ProcessCollection.Where(n => n.Name == pname) != null)
+            //        SelItem = ProcessCollection.Where(n => n.Pid == id).FirstOrDefault();
 
             //}
         }
